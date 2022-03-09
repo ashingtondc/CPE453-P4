@@ -30,7 +30,10 @@ def writeBlock(disk, bNum, buffer):
         disk.seek(bNum*BLOCKSIZE)
         data = bytearray(buffer['block'])
         # Only write BLOCKSIZE bytes to the disk
-        disk.write(data[:BLOCKSIZE])
+        if len(data) <= BLOCKSIZE:
+            disk.write(data)
+        else:
+            disk.write(data[:BLOCKSIZE])
         disk.seek(0)
     except:
         return -1
