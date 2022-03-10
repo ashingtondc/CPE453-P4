@@ -1,8 +1,6 @@
 from os.path import exists
 
 BLOCKSIZE = 256
-DEFAULT_DISK_SIZE = 10240
-DEFAULT_DISK_NAME = "tinyFSDisk"
 
 def openDisk(filename, nBytes=0):
     try:
