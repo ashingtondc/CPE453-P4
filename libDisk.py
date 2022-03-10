@@ -1,8 +1,6 @@
 from os.path import exists
 
 BLOCKSIZE = 256
-DEFAULT_DISK_SIZE = 10240
-DEFAULT_DISK_NAME = "tinyFSDisk"
 
 def openDisk(filename, nBytes=0):
     try:
@@ -32,7 +30,10 @@ def writeBlock(disk, bNum, buffer):
         disk.seek(bNum*BLOCKSIZE)
         data = bytearray(buffer['block'])
         # Only write BLOCKSIZE bytes to the disk
-        disk.write(data[:BLOCKSIZE])
+        if len(data) <= BLOCKSIZE:
+            disk.write(data)
+        else:
+            disk.write(data[:BLOCKSIZE])
         disk.seek(0)
     except:
         return -1

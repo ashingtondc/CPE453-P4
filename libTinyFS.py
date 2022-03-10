@@ -12,7 +12,6 @@ ROOT_INODE = 0x01
 DEFAULT_DISK_SIZE = 10240
 DEFAULT_DISK_NAME = "tinyFSDisk"
 
-
 class tinyFS:
 
     def __init__(self):
@@ -183,6 +182,7 @@ class tinyFS:
                 # No free blocks.
                 return -4
             block_num = block_num[0]
+
             self.free_block_table[block_num - 2] = 1
 
             # Update the file table
