@@ -1,4 +1,5 @@
 from importlib.util import MAGIC_NUMBER
+from logging import root
 
 # from numpy import block
 from libDisk import BLOCKSIZE
@@ -52,6 +53,7 @@ class tinyFS:
         # self.file_table = None
         self.file_table = [None] * MAX_OPEN_FILES # stores inode number at 
         self.free_fds = deque(range(0, MAX_OPEN_FILES), maxlen=MAX_OPEN_FILES)
+
 
     def __str__(self):
         return f"\
@@ -154,7 +156,36 @@ class tinyFS:
     # Write updated superblock back to disk
     # Write updated root inode back to disk
     def tfs_unmount(self):
-        pass
+        # superblock
+        superblock_data = [MAGIC_NUMBER, ROOT_INODE, len(self.free_block_table)] + list(self.free_block_table)
+        superblock = {"block": array('B', superblock_data)}
+        ld.writeBlock(self.current_disk, SUPERBLOCK, superblock)
+
+        # Root INODE
+        root_dir = self.file_table[self.root_dir_fd][0]
+        num_files = len(root_dir.files.keys())
+        data = bytearray()
+        for key,val in root_dir.files.items():
+
+            pair = [val]
+            pair = array('B', pair)
+            pair = bytearray(pair)
+            pair.extend(key)
+
+            for i in range(8 - len(key)):
+                pair.append(0)
+            data.extend(pair)
+        num_files = array('B', [num_files])
+        num_files = bytearray(num_files)
+        root_data = num_files + data
+        root_buffer = {"block": root_data}
+        ld.writeBlock(self.current_disk, ROOT_INODE, root_buffer)
+        
+        # Reset values
+        self.current_disk = None
+        self.mounted = False
+        self.current_fs = ""
+
 
     # Opens a file for reading and writing on the currently mounted file system. Creates 
     # a dynamic resource table entry for the file (the structure that tracks open files, 
