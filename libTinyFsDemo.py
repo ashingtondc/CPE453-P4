@@ -48,6 +48,7 @@ if __name__ == "__main__":
         result.append(chr(buffer['byte']))
     result = "".join(result)
     print(result)
+    fs.tfs_close(fd)
 
 
 

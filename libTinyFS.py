@@ -276,11 +276,11 @@ class tinyFS:
             if mode == "block" and block is not None: # initialize using preexisting block
                 data = {}
                 ld.readBlock(self.fs.current_disk, block, data)
-                bytes = data['block']
+                bytes = bytearray(data['block'])
                 self.size = int.from_bytes(bytes[:2], byteorder="little")
                 self.filetype = bytes[2] # 0 for regular file, 1 for directory
                 self.num_blocks = bytes[3]
-                self.data_blocks = bytes[4:4 + self.num_blocks] # for now, just direct blocks
+                self.data_blocks = list(bytes[4:4 + self.num_blocks]) # for now, just direct blocks
             elif mode == "new": # create new Inode
                 self.size = 0
                 self.filetype = filetype
