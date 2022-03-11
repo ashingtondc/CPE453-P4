@@ -108,6 +108,8 @@ class tinyFS:
         superblock = {"block": array('B', superblock_data)}
         ld.writeBlock(disk, SUPERBLOCK, superblock)
 
+        self.current_disk = None
+
         return disk
 
     # tfs_mount(char *filename) “mounts” a TinyFS file system located within ‘filename’. 
@@ -115,6 +117,8 @@ class tinyFS:
     # type. Only one file system may be mounted at a time.  Must return a specified success/error code.
     def tfs_mount(self, filename):
         disk = ld.openDisk(filename)
+        self.current_disk = disk
+
         """
         if disk < 0: # error
             return disk # for now, return same error code
@@ -140,7 +144,6 @@ class tinyFS:
         print(root_directory)
 
         self.mounted = True
-        self.current_disk = disk
         self.current_fs = filename
 
         return 0
@@ -199,9 +202,11 @@ class tinyFS:
     # Writes buffer ‘buffer’ of size ‘size’, which represents an entire file’s contents, 
     # to the file described by ‘FD’. Sets the file pointer to 0 (the start of file) when done. 
     # Returns success/error codes.
-    def tfs_write(self, FD, buffer, size):
+    # Caller must encode bytes
+    def tfs_write(self, FD, buffer):
         # use file write() method
-        pass
+        data = buffer['bytes']
+        return self.file_table[FD].write(data, len(data))
     
     # deletes a file and marks its blocks as free on disk.
     def tfs_delete(self, FD):
@@ -210,13 +215,13 @@ class tinyFS:
     # reads one byte from the file and copies it to ‘buffer’, using the current file pointer 
     # location and incrementing it by one upon success. If the file pointer is already at the 
     # end of the file then tfs_readByte() should return an error and not increment the file pointer.
-    def tfs_readByte(FD, buffer):
-        pass
+    def tfs_readByte(self, FD, buffer):
+        return self.file_table[FD].readByte(buffer)
 
     # Change the file pointer location to offset (absolute). Returns success/error codes.
-    def tfs_seek(FD, offset):
+    def tfs_seek(self, FD, offset):
         # update file pointer in file_table
-        pass
+        return self.file_table[FD].seek(offset)
 
     # Allocate a certain number of free blocks.
     # Returns an array of the free block numbers, or None if not enough were found.
@@ -286,6 +291,8 @@ class tinyFS:
                 self.inode = self.fs.Inode(self.fs, mode="block", block=block)
             elif mode == "new":
                 self.inode = self.fs.Inode(self.fs, mode="new", filetype=0)
+            # Acts as a file pointer. Points to a byte within the file.
+            self.position = 0
         
         def write(self, bytes, size):
             # ensure bytes are aligned to blocksize
@@ -306,10 +313,38 @@ class tinyFS:
                 ld.writeBlock(self.fs.current_disk, self.inode.data_blocks[i], buffer)
                 i += 1
             # if extra space, free unused blocks
-            self.inode.data_blocks = self.inode.data_blocks[:i]
             self.fs.free(self.inode.data_blocks[i:])
+            self.inode.data_blocks = self.inode.data_blocks[:i]
             self.inode.size = size
             self.inode.num_blocks = i
+            # Set fp to 0
+            self.position = 0
+            return 0
+
+        def readByte(self, buffer):
+            if self.position >= self.inode.size:
+                # file pointer is past the file
+                return -5
+            # Relative block num
+            block_num = self.position // BLOCKSIZE
+            # Absolute block num
+            block_num = self.inode.data_blocks[block_num]
+            local_buffer = {}
+            ld.readBlock(self.fs.current_disk, block_num, local_buffer)
+            block = local_buffer['block']
+            block = bytearray(block)
+            byte_index = self.position % BLOCKSIZE
+            buffer['byte'] = block[byte_index]
+            self.position += 1
+            return 0
+
+        def seek(self, position):
+            if position >= 0 and position < self.inode.size:
+                self.position = position
+                return 0
+            # Specified position out of bounds
+            return -6
+            
 
 
     class Directory(File):
@@ -360,7 +395,8 @@ class tinyFS:
             data = {}
             start = self.num_files * 9
             end = start + 9
-            ld.readBlock(self.fs.current_disk, self.inode.data_blocks[0], data)
+            error = ld.readBlock(self.fs.current_disk, self.inode.data_blocks[0], data)
+            # print(error)
             bytes = data['block']
             bytes = bytes[:start] + inode.to_bytes(1, byteorder='big') + filename
             self.num_files += 1
