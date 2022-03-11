@@ -1,0 +1,25 @@
+Remy Wolf, Ash Parasa
+CPE 433-03
+Program 4
+
+Our TinyFS simulator was implemented in Python. It includes most of the core functionality and a few of the additional features. 
+libDisk is completely implemented, and most of the TinyFS functions are complete. The filesystem can be created and mounted, and
+individual files can be opened and closed. If a file is opened and does not already exist, it will be created. Files can be written
+to and read, and seek can be used to adjust the current location within the file. The library uses object representations of Inodes,
+Files, and Directories to store their contents in memory. Files will dynamically allocate and free blocks based on how much data
+is written to them, allowing for maximum usage of the free blocks available. (Can files be deleted?)
+
+In addition to the core functionality, we have included limited support for hierarchical directories. The root directory is stored
+as a directory, with a bit in its Inode to indicate it is a different type of file. It stores inode number/name pairs in its data block.
+Other directories can be created by calling the open function with a name ending in a slash. (Are directories traversable?)
+
+We imposed several limits on the system for the sake of simplicity. The user can only open 20 files at a time as that is the number
+of file descriptors the system allocates. The largest filename is 8 characters, as there are 8 bytes reserved for a filename in a
+directory's data block. A directory can contain at most 28 files, as that is the maximum number of name/inode pairs that can fit into
+one 256-byte data block. The superblock only uses one byte to denote the number of free blocks, meaning there are 256 free blocks
+available, for a max amount of 65,536 bytes. (Two of these blocks will be reserved for the root directory inode and data block,
+meaning the user has 254 available.) Inodes only store direct blocks, and reserve three bytes for size, number of free blocks, and
+file type, meaning a file could have at most 253 blocks allocated to it, for a max filesize of 64,768 bytes. However, because only
+one byte is used to denote size, the system is technically only equipped to handle a file of max size 255 bytes. Neither of these
+limits are explicitly enforced by the system, and behavior is undefined if a user tries to create a file larger than either of
+these limits. There is no limit on the number of Inodes other than the number of free blocks available.
