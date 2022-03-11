@@ -178,12 +178,13 @@ class tinyFS:
                 # No free blocks.
                 return -4
             inode = inode[0]
+            print(f"Writing")
 
             # Update the file table
             if name[-1] == "/":
                 file = self.create_directory(mode="new", block=inode)
             else:
-                file = self.create_file(mode="new")
+                file = self.create_file(mode="new", block=inode)
             
             data = {'block': file.inode.encode()}
             ld.writeBlock(self.current_disk, inode, data)
@@ -195,9 +196,19 @@ class tinyFS:
         return fd
     
     # Closes the file and removes dynamic resource table entry.
-    def tfs_close(self, fs):
+    def tfs_close(self, FD):
+        # Write updated INODE info to disk
+        f = self.file_table[FD]
+        data = {'block': f.inode.encode()}
+        ld.writeBlock(self.current_disk, f.inode.number, data)
+
         # remove entry from file table, add file descriptor back to queue
-        pass
+        if FD >=0 and FD < MAX_OPEN_FILES:
+            self.free_fds.appendleft(FD)
+            self.file_table[FD] = None
+        else:
+            # Invalid file descriptor
+            return -7
 
     # Writes buffer ‘buffer’ of size ‘size’, which represents an entire file’s contents, 
     # to the file described by ‘FD’. Sets the file pointer to 0 (the start of file) when done. 
@@ -261,14 +272,15 @@ class tinyFS:
 
         def __init__(self, filesystem, mode="new", filetype = 0, block=None):
             self.fs = filesystem
+            self.number = block
             if mode == "block" and block is not None: # initialize using preexisting block
                 data = {}
                 ld.readBlock(self.fs.current_disk, block, data)
                 bytes = data['block']
-                self.size = bytes[0]
-                self.filetype = bytes[1] # 0 for regular file, 1 for directory
-                self.num_blocks = bytes[2]
-                self.data_blocks = bytes[3:3 + self.num_blocks] # for now, just direct blocks
+                self.size = int.from_bytes(bytes[:2], byteorder="little")
+                self.filetype = bytes[2] # 0 for regular file, 1 for directory
+                self.num_blocks = bytes[3]
+                self.data_blocks = bytes[4:4 + self.num_blocks] # for now, just direct blocks
             elif mode == "new": # create new Inode
                 self.size = 0
                 self.filetype = filetype
@@ -278,7 +290,14 @@ class tinyFS:
                 raise ValueError(f"unknown mode type {mode}")
 
         def encode(self):
-            return bytearray([self.size, self.filetype, self.num_blocks] + self.data_blocks)
+            # Give size 2 bytes
+            file_size = array("H", [self.size])
+            file_size = bytearray(file_size)
+
+            # Everything else gets 1 byte
+            data1 = [self.filetype, self.num_blocks] + self.data_blocks
+            data = array('B', data1)
+            return file_size + bytearray(data)
 
         def __str__(self):
             return f"Inode(Size: {self.size}, Filetype: {self.filetype}, # Blocks: {self.num_blocks}, Blocks: {self.data_blocks})"
@@ -290,7 +309,7 @@ class tinyFS:
             if mode == "block" and block is not None:
                 self.inode = self.fs.Inode(self.fs, mode="block", block=block)
             elif mode == "new":
-                self.inode = self.fs.Inode(self.fs, mode="new", filetype=0)
+                self.inode = self.fs.Inode(self.fs, mode="new", block=block, filetype=0)
             # Acts as a file pointer. Points to a byte within the file.
             self.position = 0
         
