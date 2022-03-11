@@ -7,11 +7,14 @@ libDisk is completely implemented, and most of the TinyFS functions are complete
 individual files can be opened and closed. If a file is opened and does not already exist, it will be created. Files can be written
 to and read, and seek can be used to adjust the current location within the file. The library uses object representations of Inodes,
 Files, and Directories to store their contents in memory. Files will dynamically allocate and free blocks based on how much data
-is written to them, allowing for maximum usage of the free blocks available. (Can files be deleted?)
+is written to them, allowing for maximum usage of the free blocks available. Finally, files can be deleted and their data blocks will
+be freed, as well as their entry being deleted from the root directory's data.
 
-In addition to the core functionality, we have included limited support for hierarchical directories. The root directory is stored
-as a directory, with a bit in its Inode to indicate it is a different type of file. It stores inode number/name pairs in its data block.
-Other directories can be created by calling the open function with a name ending in a slash. (Are directories traversable?)
+In addition to the core functionality, we have included the structures necessary to support hierarchical directories, but did not have
+the time to fully implement them. The root directory is stored as a directory, with a bit in its Inode to indicate it is a different
+type of file. It stores inode number/name pairs in its data block. Other directories can be created by calling the open function with
+a name ending in a slash. However, the user cannot currently add files to a directory or traverse directories, and all files are
+ultimately stored in the root directory regardless of filename.
 
 We imposed several limits on the system for the sake of simplicity. The user can only open 20 files at a time as that is the number
 of file descriptors the system allocates. The largest filename is 8 characters, as there are 8 bytes reserved for a filename in a
@@ -22,4 +25,7 @@ meaning the user has 254 available.) Inodes only store direct blocks, and reserv
 file type, meaning a file could have at most 253 blocks allocated to it, for a max filesize of 64,768 bytes. However, because only
 one byte is used to denote size, the system is technically only equipped to handle a file of max size 255 bytes. Neither of these
 limits are explicitly enforced by the system, and behavior is undefined if a user tries to create a file larger than either of
-these limits. There is no limit on the number of Inodes other than the number of free blocks available.
+these limits. There is no limit on the number of Inodes other than the number of free blocks available. Lastly, there is a bug when
+trying to remount the system after calling unmount(). The unmount() function works and writes the necessary data to disk, but an
+index out of bounds error will be trhown when trying to call mount() again. We did not have enough time to fully investigate the
+cause of this bug.
