@@ -169,7 +169,7 @@ class tinyFS:
             if name[-1] == "/":
                 file = self.create_directory(mode="block", block=inode)
             else:
-                file = self.create_file(mode="block", block=inode)
+                file = self.create_file(mode="block", block=inode, name=name)
 
         else:
             # Find open block
@@ -184,7 +184,7 @@ class tinyFS:
             if name[-1] == "/":
                 file = self.create_directory(mode="new", block=inode)
             else:
-                file = self.create_file(mode="new", block=inode)
+                file = self.create_file(mode="new", block=inode, name=name)
             
             data = {'block': file.inode.encode()}
             ld.writeBlock(self.current_disk, inode, data)
@@ -221,7 +221,36 @@ class tinyFS:
     
     # deletes a file and marks its blocks as free on disk.
     def tfs_delete(self, FD):
-        pass
+
+        # Remove from root dir table
+        root_dir = self.file_table[self.root_dir_fd][0]
+        # print(root_dir.files)
+        f = self.file_table[FD]
+        # print(f.name)
+
+        # print(self.free_block_table)
+
+        # Free file's inode
+        self.free([root_dir.files[f.name]])
+
+        del root_dir.files[f.name]
+
+        # print(root_dir.files)
+
+        # free blocks
+        self.free(f.inode.data_blocks)
+
+        # print(self.free_block_table)
+
+
+        # remove entry from file table, add file descriptor back to queue
+        if FD >=0 and FD < MAX_OPEN_FILES:
+            self.free_fds.appendleft(FD)
+            self.file_table[FD] = None
+        else:
+            # Invalid file descriptor
+            return -7
+
 
     # reads one byte from the file and copies it to ‘buffer’, using the current file pointer 
     # location and incrementing it by one upon success. If the file pointer is already at the 
@@ -255,8 +284,8 @@ class tinyFS:
             print(f"free {block}")
             self.free_block_table[block - 2] = 0
 
-    def create_file(self, mode="new", block=None):
-        return self.File(self, mode, block)
+    def create_file(self, mode="new", block=None, name=None):
+        return self.File(self, mode, block, name)
 
     def create_directory(self, mode="new", block=None, parent=ROOT_INODE):
         return self.Directory(self, mode, block, parent)
@@ -304,7 +333,7 @@ class tinyFS:
 
 
     class File:
-        def __init__(self, filesystem, mode="new", block=None):
+        def __init__(self, filesystem, mode="new", block=None, name=None):
             self.fs = filesystem
             if mode == "block" and block is not None:
                 self.inode = self.fs.Inode(self.fs, mode="block", block=block)
@@ -312,6 +341,7 @@ class tinyFS:
                 self.inode = self.fs.Inode(self.fs, mode="new", block=block, filetype=0)
             # Acts as a file pointer. Points to a byte within the file.
             self.position = 0
+            self.name = name
         
         def write(self, bytes, size):
             # ensure bytes are aligned to blocksize
